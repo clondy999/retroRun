@@ -110,6 +110,11 @@ struct menu_keymap {
 	short pbtn;
 };
 
+struct mod_keymap {
+	short inkey;
+	short outkey;
+};
+
 struct in_pdata {
 	const struct in_default_bind *defbinds;
 	const struct menu_keymap *key_map;
@@ -117,6 +122,9 @@ struct in_pdata {
 	const struct menu_keymap *joy_map;
 	size_t jmap_size;
 	const char * const *key_names;
+	short mod_key;
+	const struct mod_keymap *mod_keymap;
+	size_t modmap_size;
 };
 
 /* to be called by drivers */
