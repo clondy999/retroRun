@@ -78,6 +78,8 @@ static void toggle_fast_forward(int force_off)
 	}
 }
 
+// below is not exist in libpng12
+#if 0
 static int screenshot_file_name(char *name, size_t len) {
 	char suffix[MAX_PATH];
 
@@ -162,8 +164,11 @@ finish:
 	png_destroy_write_struct(&png_ptr, &info_ptr);
 	return ret;
 }
-
+#endif
 int screenshot(void) {
+#if 1
+	return 0;
+#else
 	FILE *fp;
 	char filename[MAX_PATH];
 	int w, h;
@@ -189,6 +194,7 @@ finish:
 	if (fp)
 		fclose(fp);
 	return ret;
+#endif
 }
 
 void set_defaults(void)
@@ -199,7 +205,8 @@ void set_defaults(void)
 	limit_frames = 1;
 	enable_audio = 1;
 	audio_buffer_size = 5;
-	scale_size = SCALE_SIZE_NONE;
+	//scale_size = SCALE_SIZE_NONE;
+	scale_size = SCALE_SIZE_INTEGER;
 	scale_filter = SCALE_FILTER_NEAREST;
 	scale_update_scaler();
 

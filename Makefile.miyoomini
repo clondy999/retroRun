@@ -1,3 +1,5 @@
+CROSS_COMPILE = arm-linux-gnueabihf-
+
 # Global definitions
 platform   ?= unix
 
@@ -11,10 +13,11 @@ OBJS      = libpicofe/input.o libpicofe/in_sdl.o libpicofe/linux/in_evdev.o libp
 BIN       = picoarch
 
 CFLAGS     += -Wall
-CFLAGS     += -fdata-sections -ffunction-sections -DPICO_HOME_DIR='"/.picoarch/"' -flto -DLANG_KOR
+CFLAGS     += -fdata-sections -ffunction-sections -DPICO_HOME_DIR='"/.picoarch/"' -flto -DMIYOOMINI -DLANG_KOR
 CFLAGS     += -I./ -I./libretro-common/include/ $(shell $(SYSROOT)/usr/bin/sdl-config --cflags)
 
-LDFLAGS    = -lc -ldl -lgcc -lm -lSDL -lasound -lpng -lz -Wl,--gc-sections -flto
+#-lasound -lpng
+LDFLAGS    = -lc -ldl -lgcc -lm -lSDL -lpng12 -lz -Wl,--gc-sections -flto
 
 # Unpolished or slow cores that build
 # EXTRA_CORES += fbalpha2012
@@ -52,6 +55,11 @@ smsplus-gx_CORE = smsplus_libretro.so
 
 snes9x2005_REPO = https://git.crowdedwood.com/snes9x2005
 snes9x2005_REVISION = performance
+
+# for miyoo mini
+CFLAGS += -marm -mcpu=cortex-a7 -mfpu=neon-vfpv4 -mfloat-abi=hard
+CFLAGS += -fomit-frame-pointer -ftree-vectorize -flto -fno-PIC
+LDFLAGS += -fno-PIC
 
 ifeq ($(platform), trimui)
 	OBJS += plat_trimui.o
@@ -102,7 +110,8 @@ SOFILES = $(foreach core,$(CORES),$(core)_libretro.so)
 print-%:
 	@echo '$*=$($*)'
 
-all: $(BIN) cores
+#all: $(BIN) cores
+all: $(BIN)
 
 libpicofe/.patched:
 	cd libpicofe && git apply -p1 < ../patches/libpicofe/0001-key-combos.patch && touch .patched

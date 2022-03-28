@@ -1,8 +1,15 @@
 #ifndef __SCALE_H__
 #define __SCALE_H__
 
+
+#if 1
+#define SCREEN_WIDTH 640
+#define SCREEN_HEIGHT 480
+#else
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
+#endif
+
 #define SCREEN_BPP 2
 #define SCREEN_PITCH (SCREEN_BPP * SCREEN_WIDTH)
 
@@ -10,6 +17,8 @@ enum scale_size {
 	SCALE_SIZE_NONE,
 	SCALE_SIZE_ASPECT,
 	SCALE_SIZE_FULL,
+	SCALE_SIZE_INTEGER,
+	SCALE_SIZE_INTEGER_CROP,
 };
 
 enum scale_filter {

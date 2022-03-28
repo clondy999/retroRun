@@ -13,6 +13,7 @@
 #include "overrides/smsplus.h"
 #include "overrides/snes9x2002.h"
 #include "overrides/snes9x2005.h"
+#include "overrides/mgba.h"
 #include "util.h"
 
 static const struct core_override overrides[] = {

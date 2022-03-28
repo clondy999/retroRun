@@ -66,11 +66,44 @@ static int g_menu_filter_off;
 static int g_border_style;
 static int border_left, border_right, border_top, border_bottom;
 
+#ifdef LANG_KOR
+int utf8len(char *s) // width of cjk and english are same
+{
+   int ret = 0;
+
+   for (int i = 0; i < (int)strlen(s); i++) 
+   {
+      if (((s[i] & 0x80) == 0x0) || // english
+	  ((s[i] & 0xF0) == 0xE0)) // cjk font
+         ret++;
+   }
+   return ret;
+}
+#endif
+
 void menuscreen_memset_lines(unsigned short *dst, int c, int l)
 {
 	for (; l > 0; l--, dst += g_menuscreen_pp)
 		memset(dst, c, g_menuscreen_w * 2);
 }
+
+
+#ifdef LANG_KOR
+unsigned short utf8_to_unicode(unsigned char c1, unsigned char c2, unsigned char c3)
+{
+	unsigned short c=0;
+	
+	if ((c1 & 0xf0) == 0xe0)
+		if ((c2 & 0xc0) == 0x80)
+			if ((c3 & 0xc0) == 0x80)
+			{
+				c = ((c1 & 0xf) << 12) | ((c2 & 0x3f) << 6) | (c3 & 0x3f);
+				return c;
+			}
+			
+	return 0;
+}
+#endif
 
 // draws text to current bbp16 screen
 static void text_out16_(int x, int y, const char *text, int color)
@@ -101,6 +134,45 @@ static void text_out16_(int x, int y, const char *text, int color)
 
 	for (i = 0; i < len; i++)
 	{
+#ifdef LANG_KOR
+		unsigned short usCode;
+		usCode = utf8_to_unicode(text[i], text[i+1], text[i+2]);
+		
+		if (usCode >= 0xac00 && usCode <= 0xd7a3) { // unicode hangul code range 
+	
+		//unsigned char  *src = menu_font_data + (unsigned int)text[i] * me_mfont_w * me_mfont_h / 2;
+		unsigned short *dst = dest;
+		int u, l;
+		
+//korfontdata8x8;
+		for (l = 0; l < 8*2; l++, dst += g_menuscreen_pp - 8*2)
+		{
+			for (u = 0; u < 8*2; u++)
+			{
+				unsigned char rem = 1 << (((u/2) + (l/2) * 8) & 7);
+				unsigned char offset  = ((u/2) + (l/2) * 8) >> 3;
+				if ((korfontdata8x8[(usCode-0xac00)*8 + offset] & rem) > 0)	
+				{					
+				
+				int c, r, g, b;
+				c = 0xf;
+				r = (*dst & 0xf800) >> 8;
+				g = (*dst & 0x07e0) >> 3;
+				b = (*dst & 0x001f) << 3;
+				r = (c^0xf)*r/15 + c*tr/15;
+				g = (c^0xf)*g/15 + c*tg/15;
+				b = (c^0xf)*b/15 + c*tb/15;
+				*dst = ((r<<8)&0xf800) | ((g<<3)&0x07e0) | (b>>3);
+				}
+				dst++;
+
+			}
+		}
+		i+=2;
+		dest += me_mfont_w;		
+	}
+		else {
+#endif			
 		unsigned char  *src = menu_font_data + (unsigned int)text[i] * me_mfont_w * me_mfont_h / 2;
 		unsigned short *dst = dest;
 		int u, l;
@@ -129,6 +201,9 @@ static void text_out16_(int x, int y, const char *text, int color)
 			}
 		}
 		dest += me_mfont_w;
+#ifdef LANG_KOR
+		}
+#endif
 	}
 
 	if (x < border_left)
@@ -169,7 +244,7 @@ static void smalltext_out16_(int x, int y, const char *texto, int color)
 	int multiplier = me_sfont_w / 6;
 	int i;
 
-	for (i = 0;; i++, x += me_sfont_w)
+	for (i = 0;; i++)
 	{
 		unsigned char c = (unsigned char) texto[i];
 		int h = 8;
@@ -177,6 +252,31 @@ static void smalltext_out16_(int x, int y, const char *texto, int color)
 		if (!c || c == '\n')
 			break;
 
+#ifdef LANG_KOR
+		unsigned short usCode;
+		usCode = utf8_to_unicode(texto[i], texto[i+1], texto[i+2]);
+		
+		if (usCode >= 0xac00 && usCode <= 0xd7a3) { // unicode hangul code range 
+			dst = (unsigned short *)g_menuscreen_ptr + x + y * g_menuscreen_pp;
+			for (unsigned char l = 0; l < 8*2; l++, dst += g_menuscreen_pp - 8*2)
+			{
+				for (unsigned char u = 0; u < 8*2; u++)
+				{
+					unsigned char rem = 1 << (((u/2) + (l/2) * 8) & 7);
+					unsigned char offset  = ((u/2) + (l/2) * 8) >> 3;
+					if ((korfontdata8x8[(usCode-0xac00)*8 + offset] & rem) > 0)	
+					{					
+						*dst = color;
+					}
+					dst++;
+
+				}
+			}
+			i+=2;		
+			x += 8*2;
+		}
+		else {
+#endif
 		src = fontdata6x8[c];
 		dst = (unsigned short *)g_menuscreen_ptr + x + y * g_menuscreen_pp;
 
@@ -197,6 +297,11 @@ static void smalltext_out16_(int x, int y, const char *texto, int color)
 			}
 			src++;
 		}
+		
+		x += me_sfont_w;
+#ifdef LANG_KOR
+		}
+#endif
 	}
 }
 
@@ -537,11 +642,19 @@ static void me_draw(const menu_entry *entries, int sel, void (*draw_more)(void))
 		}
 
 		name = NULL;
+#ifdef LANG_KOR
+		wt = utf8len(ent->name) * me_mfont_w;
+#else		
 		wt = strlen(ent->name) * me_mfont_w;
+#endif
 		if (wt == 0 && ent->generate_name)
 			name = ent->generate_name(ent->id, &offs);
 		if (name != NULL)
+#ifdef LANG_KOR
+			wt = utf8len(name) * me_mfont_w;
+#else
 			wt = strlen(name) * me_mfont_w;
+#endif
 
 		if (ent->beh != MB_NONE)
 		{
@@ -564,7 +677,11 @@ static void me_draw(const menu_entry *entries, int sel, void (*draw_more)(void))
 				if (ent->generate_name != NULL)
 					name = ent->generate_name(ent->id, &offs);
 				if (name != NULL)
+#ifdef LANG_KOR
+					wt += (utf8len(name) + offs) * me_mfont_w;
+#else
 					wt += (strlen(name) + offs) * me_mfont_w;
+#endif
 				break;
 			case MB_OPT_ENUM:
 				wt += 10 * me_mfont_w;
@@ -614,7 +731,12 @@ static void me_draw(const menu_entry *entries, int sel, void (*draw_more)(void))
 		}
 		if (name != NULL) {
 			text_out16(x, y, name);
+#if 0
+			// check again by trngaje
+			leftname_end = x + (utf8len(name) + 1) * me_mfont_w;
+#else
 			leftname_end = x + (strlen(name) + 1) * me_mfont_w;
+#endif
 		}
 
 		switch (ent->beh) {
@@ -640,7 +762,12 @@ static void me_draw(const menu_entry *entries, int sel, void (*draw_more)(void))
 			names = (const char **)ent->data;
 			for (i = 0; names[i] != NULL; i++) {
 				offs = x + col2_offs;
+#if 0
+				// check again by trngaje
+				len = utf8len(names[i]);
+#else
 				len = strlen(names[i]);
+#endif
 				if (len > 10)
 					offs += (10 - len - 2) * me_mfont_w;
 				if (offs < leftname_end)
@@ -851,7 +978,11 @@ static void do_delete(const char *fpath, const char *fname)
 
 	menu_draw_begin(1, 0);
 
+#ifdef LANG_KOR
+	len = utf8len(fname);
+#else
 	len = strlen(fname);
+#endif
 	if (len > g_menuscreen_w / me_sfont_w)
 		len = g_menuscreen_w / me_sfont_w;
 
@@ -865,7 +996,11 @@ static void do_delete(const char *fpath, const char *fname)
 	len = strlen(tmp);
 	nm = in_get_key_name(-1, -PBTN_MBACK);
 	snprintf(tmp + len, sizeof(tmp) - len, "%s - cancel)", nm);
+#ifdef LANG_KOR
+	len = utf8len(tmp);
+#else
 	len = strlen(tmp);
+#endif
 
 	text_out16(mid - me_mfont_w * len / 2, 12 * me_mfont_h, tmp);
 	menu_draw_end();
@@ -1425,7 +1560,11 @@ static void draw_key_config(const me_bind_action *opts, int opt_cnt, int player_
 		dev_name = "(all devices)";
 	else
 		dev_name = in_get_dev_name(dev_id, 0, 1);
+#ifdef LANG_KOR
+	w = utf8len(dev_name) * me_mfont_w;
+#else
 	w = strlen(dev_name) * me_mfont_w;
+#endif
 	if (w < 30 * me_mfont_w)
 		w = 30 * me_mfont_w;
 	if (w > g_menuscreen_w)

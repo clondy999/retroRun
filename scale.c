@@ -5,6 +5,10 @@
 #include "main.h"
 #include "options.h"
 #include "scale.h"
+#include <stdio.h>
+
+#define MIN(a,b) ((a < b) ? a : b)
+#define MAX(a,b) ((a > b) ? a : b)
 
 typedef void (*scaler_t)(unsigned w, unsigned h, size_t pitch, const void *src, void *dst);
 
@@ -94,6 +98,111 @@ static void scale_null(unsigned w, unsigned h, size_t pitch, const void *src, vo
 static void scale_memcpy(unsigned w, unsigned h, size_t pitch, const void *src, void *dst) {
 	dst += dst_offs;
 	memcpy(dst, src, h * pitch);
+}
+
+
+static void scale_nx(unsigned w, unsigned h, size_t pitch, const void *src, void *dst) 
+{	
+	dst += dst_offs;
+	uint8_t nscale = MIN(SCREEN_HEIGHT / h, SCREEN_WIDTH / w); 
+
+	uint16_t *usrc;
+	uint16_t *udst=(uint16_t *)dst;
+	uint16_t value;
+	uint16_t *udstCopy;
+	
+	for (uint16_t y = 0; y < h*nscale; y++) {
+		usrc = (uint16_t *)src + (y/nscale) * (pitch/2);	
+		udst = (uint16_t *)dst + y * (SCREEN_PITCH /2);	
+
+		if (y%nscale == 0) {
+			udstCopy = udst;
+			
+			for(uint16_t x=0; x<w*nscale; x++) {
+				if (x%nscale == 0) {
+					value = *usrc;
+					usrc++;
+				}
+				*udst = value;
+				udst++;
+			}
+		}
+		else {
+			memcpy(udst, udstCopy, w*nscale*2);
+		}
+	}
+}
+
+
+static void scale_nx_crop(unsigned w, unsigned h, size_t pitch, const void *src, void *dst) 
+{
+	
+	if (w==240 && h==160) // for gba
+	{
+		uint8_t nscale = MAX(SCREEN_HEIGHT / h, SCREEN_WIDTH / w);  // crop
+		
+		unsigned src_x = ((w* nscale - SCREEN_WIDTH)/2) / nscale; // (720 - 640) / 2 / 3 = 80/ 2 / 3 = 40 /3 = 13
+		src += src_x*2; 
+		w=SCREEN_WIDTH / nscale;
+		
+		uint16_t *usrc;
+		uint16_t *udst=(uint16_t *)dst;
+		uint16_t value;
+		uint16_t *udstCopy;
+		
+		for (uint16_t y = 0; y < h*nscale; y++) {
+			usrc = (uint16_t *)src + (y/nscale) * (pitch/2);	
+			udst = (uint16_t *)dst + y * (SCREEN_PITCH /2);	
+
+			if (y%nscale == 0) {
+				udstCopy = udst;
+				
+				for(uint16_t x=0; x<w*nscale; x++) {
+					if (x%nscale == 0) {
+						value = *usrc;
+						usrc++;
+					}
+					*udst = value;
+					udst++;
+				}
+			}
+			else {
+				memcpy(udst, udstCopy, w*nscale*2);
+			}
+		}		
+	}
+	else { // temp
+		
+	dst += dst_offs;
+	uint8_t nscale = MIN(SCREEN_HEIGHT / h, SCREEN_WIDTH / w); 
+
+	uint16_t *usrc;
+	uint16_t *udst=(uint16_t *)dst;
+	uint16_t value;
+	uint16_t *udstCopy;
+	
+	for (uint16_t y = 0; y < h*nscale; y++) {
+		usrc = (uint16_t *)src + (y/nscale) * (pitch/2);	
+		udst = (uint16_t *)dst + y * (SCREEN_PITCH /2);	
+
+		if (y%nscale == 0) {
+			udstCopy = udst;
+			
+			for(uint16_t x=0; x<w*nscale; x++) {
+				if (x%nscale == 0) {
+					value = *usrc;
+					usrc++;
+				}
+				*udst = value;
+				udst++;
+			}
+		}
+		else {
+			memcpy(udst, udstCopy, w*nscale*2);
+		}
+	}
+	}
+
 }
 
 static void scale_1x(unsigned w, unsigned h, size_t pitch, const void *src, void *dst) {
@@ -431,6 +540,30 @@ static void scale_select_scaler(unsigned w, unsigned h, size_t pitch) {
 			dst_h = SCREEN_HEIGHT;
 			dst_offs = ((SCREEN_WIDTH-dst_w)/2) * SCREEN_BPP;
 		}
+	} else if (scale_size == SCALE_SIZE_INTEGER) {
+		unsigned dst_x = ((SCREEN_WIDTH - w* MIN(SCREEN_HEIGHT / h, SCREEN_WIDTH / w)) * SCREEN_BPP / 2);
+		unsigned dst_y = ((SCREEN_HEIGHT - h* MIN(SCREEN_HEIGHT / h, SCREEN_WIDTH / w) ) / 2);
+		dst_offs = dst_y * SCREEN_PITCH + dst_x;
+
+		if (pitch == SCREEN_PITCH) {
+			scaler = scale_memcpy;
+		} else {
+			scaler = scale_nx;
+		}	
+		
+		return;
+	} else if (scale_size == SCALE_SIZE_INTEGER_CROP) {
+		unsigned dst_x = ((SCREEN_WIDTH - w* MIN(SCREEN_HEIGHT / h, SCREEN_WIDTH / w)) * SCREEN_BPP / 2);
+		unsigned dst_y = ((SCREEN_HEIGHT - h* MIN(SCREEN_HEIGHT / h, SCREEN_WIDTH / w) ) / 2);
+		dst_offs = dst_y * SCREEN_PITCH + dst_x;
+
+		if (pitch == SCREEN_PITCH) {
+			scaler = scale_memcpy;
+		} else {
+			scaler = scale_nx_crop;
+		}	
+		
+		return;		
 	} else if (scale_size == SCALE_SIZE_NONE) {
 		unsigned dst_x = ((SCREEN_WIDTH - w) * SCREEN_BPP / 2);
 		unsigned dst_y = ((SCREEN_HEIGHT - h) / 2);

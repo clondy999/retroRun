@@ -10,6 +10,11 @@
 
 static SDL_Surface* screen;
 
+#ifdef MIYOOMINI_ROT180
+static SDL_Surface* screen2=NULL; // for SDL_Flip
+static SDL_Surface* screen3=NULL;
+#endif
+
 struct audio_state {
 	unsigned buf_w;
 	unsigned max_buf_w;
@@ -80,10 +85,70 @@ static int audio_resample_nearest(struct audio_frame data) {
 	return consumed;
 }
 
+#ifdef MIYOOMINI_ROT180
+// for miyoo mini
+void rotate180(SDL_Surface *src, SDL_Surface *dst)
+{
+#if 0	
+	uint16_t* BlockDst;
+    uint16_t* BlockSrc;
+	
+	//fprintf(stderr, "[trngaje] dst pitch = %d(%d), src pitch = %d(%d)\n", dst->pitch, dst->format->BytesPerPixel, src->pitch, src->format->BytesPerPixel);
+	
+	for (int i=0; i < (src->h); i++) {	
+		BlockDst = (uint16_t*)(dst->pixels) + ((dst->pitch/2) * (dst->h - i));
+		BlockDst--;
+		BlockSrc = (uint16_t*)(src->pixels) + ((src->pitch/2) * i);
+		for (int j=0; j < (src->w); j++) {	
+			*BlockDst = *BlockSrc;
+			BlockDst--;
+			BlockSrc++;
+		}
+    }
+#else
+	uint32_t* BlockDst;
+    uint16_t* BlockSrc;
+	uint32_t r,g,b,value;
+	//fprintf(stderr, "[trngaje] dst pitch = %d(%d), src pitch = %d(%d)\n", dst->pitch, dst->format->BytesPerPixel, src->pitch, src->format->BytesPerPixel);
+	
+	for (int i=0; i < (src->h); i++) {	
+		BlockDst = (uint32_t*)(dst->pixels) + ((dst->pitch/4) * (i));
+		//BlockDst = (uint32_t*)(dst->pixels) + ((dst->pitch/4) * (dst->h - i));
+		//BlockDst--;
+		BlockSrc = (uint16_t*)(src->pixels) + ((src->pitch/2) * i);
+
+		// convert 16bit to 32bit and rotate 180 degrees
+		value = ((i & 0xff) << 16) | ((i & 0xff) << 8) | (i & 0xff);
+		for (int j=0; j < (src->w); j++) {	
+			r = ((*BlockSrc) & 0xf800) << 8;
+			g = ((*BlockSrc) & 0x7e0) << 5;
+			b = ((*BlockSrc) & 0x1f) << 3;
+			value = r | g | b;
+			*BlockDst = value; //*BlockSrc;
+			BlockDst++;
+			//BlockDst--;
+			BlockSrc++;
+		}
+    }	
+#endif
+}
+#endif
+
 static void *fb_flip(void)
 {
+#ifdef MIYOOMINI_ROT180
+	SDL_LockSurface(screen2);
+	rotate180(screen, screen2);
+	
+	SDL_UnlockSurface(screen2);	
+	
+	SDL_Flip(screen2);
+
+	return screen->pixels;
+#else
 	SDL_Flip(screen);
 	return screen->pixels;
+#endif
 }
 
 void *plat_prepare_screenshot(int *w, int *h, int *bpp)
@@ -366,7 +431,11 @@ void plat_sound_write_resample(const struct audio_frame *data, int frames, int (
 			if (!limit_frames)
 				return;
 
+#if 1
+			SDL_Delay(1);
+#else
 			plat_sleep_ms(1);
+#endif
 			SDL_LockAudio();
 		}
 
@@ -440,11 +509,22 @@ int plat_init(void)
 	plat_sound_write = plat_sound_write_nearest;
 
 	SDL_Init(SDL_INIT_VIDEO);
+#ifdef MIYOOMINI_ROT180
+	screen2 = SDL_SetVideoMode(640, 480, 32, SDL_SWSURFACE);
+
+	if (screen2 == NULL) {
+		PA_ERROR("%s, failed to set video mode\n", __func__);
+		return -1;
+	}
+
+	screen = SDL_CreateRGBSurface(SDL_SWSURFACE, SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_BPP * 8,  0, 0, 0, 0); // by trngaje
+#else
 	screen = SDL_SetVideoMode(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_BPP * 8, SDL_SWSURFACE);
 	if (screen == NULL) {
 		PA_ERROR("%s, failed to set video mode\n", __func__);
 		return -1;
 	}
+#endif
 
 	SDL_ShowCursor(0);
 

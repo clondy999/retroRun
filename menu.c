@@ -15,7 +15,7 @@ static struct dirent **corelist = NULL;
 static int corelist_len = 0;
 
 #define MENU_ALIGN_LEFT 0
-#define MENU_X2 0
+#define MENU_X2 1
 
 #define MENU_ITEMS_PER_PAGE 11
 
@@ -478,6 +478,32 @@ static int menu_loop_core_options(int id, int keys)
 	return menu_loop_core_options_page(0, keys);
 }
 
+
+#ifdef LANG_KOR
+static const char h_rm_config_game[]  = "게임별 설정 파일을 제거합니다.";
+
+static const char h_restore_def[]     = "기본 설정 값으로 복구합니다.";
+
+static const char h_show_fps[]        = "초당 프레임 수를 표시합니다.";
+static const char h_show_cpu[]        = "CPU 사용량을 표시합니다.";
+
+static const char h_audio_buffer_size[]        =
+	"오디오 버퍼의 크기입니다. 더 높으면 높을 수록 \n"
+	"오디오의 깨질 가능성은 줄어들고 \n"
+	"오디오의 딜레이는 증가합니다.";
+
+static const char h_scale_size[]        =
+	"화면 확대시 얼마나 늘려야하는지.\n"
+	"Native는 확대를 하지 않음.\n"
+	"Aspect 동일한 비율을 유지합니다.\n"
+	"Full 은 전체 화면입니다.";
+
+static const char h_scale_filter[]        =
+	"확대시 픽셀을 채우는 방식입니다.\n"
+	"Nearest 마지막 픽셀을 복사합니다.\n" 
+	"Sharp 는 가능한한 정렬된 상태를 유지합니다.\n"
+	"Smooth 는 블러 효과를 추가합니다.";
+#else
 static const char h_rm_config_game[]  = "Removes game-specific config file";
 
 static const char h_restore_def[]     = "Switches back to default settings";
@@ -499,19 +525,33 @@ static const char h_scale_filter[]        =
 	"When stretching, how missing pixels are filled.\n"
 	"Nearest copies the last pixel. Sharp keeps pixels\n"
 	"aligned where possible. Smooth adds a blur effect.";
+#endif
 
+#ifdef LANG_KOR
+static const char *men_scale_size[] = { "원본", "비율 유지", "전체화면", "정수배", "정수배 잘림허용", NULL};
+#else
+static const char *men_scale_size[] = { "Native", "Aspect", "Full", "Integer", "IntegerCrop", NULL};
+#endif
 
-static const char *men_scale_size[] = { "Native", "Aspect", "Full", NULL};
 static const char *men_scale_filter[] = { "Nearest", "Sharp", "Smooth", NULL};
 
 static menu_entry e_menu_video_options[] =
 {
+#ifdef LANG_KOR
+	mee_onoff_h      ("FPS 표시",                 0, show_fps, 1, h_show_fps),
+	mee_onoff_h      ("CPU 표시 %",               0, show_cpu, 1, h_show_cpu),
+	mee_enum_h       ("화면 크기",              0, scale_size, men_scale_size, h_scale_size),
+	mee_enum_h       ("필터",                   0, scale_filter, men_scale_filter, h_scale_filter),
+	mee_range_h      ("오디오 버퍼",             0, audio_buffer_size, 1, 15, h_audio_buffer_size),
+	mee_end,
+#else
 	mee_onoff_h      ("Show FPS",                 0, show_fps, 1, h_show_fps),
 	mee_onoff_h      ("Show CPU %",               0, show_cpu, 1, h_show_cpu),
 	mee_enum_h       ("Screen size",              0, scale_size, men_scale_size, h_scale_size),
 	mee_enum_h       ("Filter",                   0, scale_filter, men_scale_filter, h_scale_filter),
 	mee_range_h      ("Audio buffer",             0, audio_buffer_size, 1, 15, h_audio_buffer_size),
 	mee_end,
+#endif
 };
 
 static int menu_loop_video_options(int id, int keys)
@@ -551,6 +591,15 @@ const char *config_label(int id, int *offs) {
 
 static menu_entry e_menu_config_options[] =
 {
+#ifdef LANG_KOR
+	mee_cust_nosave  ("전체 설정으로 저장",       MA_OPT_SAVECFG,      mh_savecfg, mgn_saveloadcfg),
+	mee_cust_nosave  ("게임 설정으로 저장",         MA_OPT_SAVECFG_GAME, mh_savecfg, mgn_saveloadcfg),
+	mee_handler_id_h ("게임 설정 제거",       MA_OPT_RMCFG_GAME,   mh_rmcfg,   h_rm_config_game),
+	mee_handler_h    ("기본 값으로 복구",         mh_restore_defaults, h_restore_def),
+	mee_label        (""),
+	mee_label_mk     (0,                          config_label),
+	mee_end,
+#else
 	mee_cust_nosave  ("Save global config",       MA_OPT_SAVECFG,      mh_savecfg, mgn_saveloadcfg),
 	mee_cust_nosave  ("Save game config",         MA_OPT_SAVECFG_GAME, mh_savecfg, mgn_saveloadcfg),
 	mee_handler_id_h ("Delete game config",       MA_OPT_RMCFG_GAME,   mh_rmcfg,   h_rm_config_game),
@@ -558,6 +607,7 @@ static menu_entry e_menu_config_options[] =
 	mee_label        (""),
 	mee_label_mk     (0,                          config_label),
 	mee_end,
+#endif
 };
 
 static int menu_loop_config_options(int id, int keys)
@@ -572,12 +622,21 @@ static int menu_loop_config_options(int id, int keys)
 
 static menu_entry e_menu_options[] =
 {
+#ifdef LANG_KOR
+	mee_handler   ("오리오와 비디오",    menu_loop_video_options),
+	mee_handler_id("에뮬레이터 옵션",   MA_OPT_CORE_OPTS,    menu_loop_core_options),
+	mee_handler_id("플레이어 키 설정",    MA_CTRL_PLAYER1,     key_config_loop_wrap),
+	mee_handler_id("에뮬레이터 키 설정",  MA_CTRL_EMU,         key_config_loop_wrap),
+	mee_handler   ("설정 값 저장",        menu_loop_config_options),
+	mee_end,
+#else
 	mee_handler   ("Audio and video",    menu_loop_video_options),
 	mee_handler_id("Emulator options",   MA_OPT_CORE_OPTS,    menu_loop_core_options),
 	mee_handler_id("Player controls",    MA_CTRL_PLAYER1,     key_config_loop_wrap),
 	mee_handler_id("Emulator controls",  MA_CTRL_EMU,         key_config_loop_wrap),
 	mee_handler   ("Save config",        menu_loop_config_options),
 	mee_end,
+#endif
 };
 
 static int menu_loop_options(int id, int keys)
@@ -614,6 +673,19 @@ static int main_menu_handler(int id, int keys)
 
 static menu_entry e_menu_main[] =
 {
+#ifdef LANG_KOR
+	mee_handler_id("게임 이어하기",        MA_MAIN_RESUME_GAME, main_menu_handler),
+	mee_handler_id("데이타 저장",         MA_MAIN_SAVE_STATE,  main_menu_handler),
+	mee_handler_id("데이타 불러오기",         MA_MAIN_LOAD_STATE,  main_menu_handler),
+	mee_handler_id("디스크 제어",       MA_MAIN_DISC_CTRL,   menu_loop_disc),
+	mee_handler_id("치트",             MA_MAIN_CHEATS,      menu_loop_cheats),
+	mee_handler   ("옵션",            menu_loop_options),
+	mee_handler_id("게임 리셋",         MA_MAIN_RESET_GAME,  main_menu_handler),
+	mee_handler_id("새로운 게임 불러오기",      MA_MAIN_CONTENT_SEL, menu_loop_select_content),
+	mee_handler_id("종료",               MA_MAIN_EXIT,        main_menu_handler),
+	
+	mee_end,
+#else
 	mee_handler_id("Resume game",        MA_MAIN_RESUME_GAME, main_menu_handler),
 	mee_handler_id("Save state",         MA_MAIN_SAVE_STATE,  main_menu_handler),
 	mee_handler_id("Load state",         MA_MAIN_LOAD_STATE,  main_menu_handler),
@@ -624,6 +696,7 @@ static menu_entry e_menu_main[] =
 	mee_handler_id("Load new game",      MA_MAIN_CONTENT_SEL, menu_loop_select_content),
 	mee_handler_id("Exit",               MA_MAIN_EXIT,        main_menu_handler),
 	mee_end,
+#endif
 };
 
 static void draw_savestate_bg(int slot)
